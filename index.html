@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>单词抽背助手</title>
+<link href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@400;900&display=swap" rel="stylesheet">
+<style>
+    body {
+        font-family: 'Noto Serif SC', serif;
+        background-color: #f0f0f0;
+        text-align: center;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        transition: background-color 0.3s ease;
+    }
+    .container {
+        width: 80%;
+        height: fit-content;
+        max-width: 1400px;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    .left-column {
+        max-width: 70%;
+        text-align: left;
+    }
+    .right-column {
+        max-width: 30%;
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+    h1 {
+        color: #333;
+        font-size: 5rem;
+        margin-bottom: 20px;
+        transition: color 0.3s ease;
+    }
+    #word-display {
+        margin-top: 20px;
+        font-size: 5.5rem;
+        font-weight: bold;
+    }
+    #hint {
+        margin-top: 10px;
+        font-style: italic;
+        color: #666;
+        font-size: 3.5rem;
+    }
+    #word-counter {
+        font-size: 2.5rem;
+        color: #333;
+        margin-top: 10px;
+    }
+    button {
+        font-family: 'Noto Serif SC', serif;
+        background-color: #008CBA;
+        color: white;
+        padding: 10px 20px;
+        font-size: 3.5rem;
+        cursor: pointer;
+        border: none;
+        border-radius: 5px;
+        margin-top: 20px;
+        transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    button:hover {
+        background-color: #005f6b;
+    }
+    .upload-btn {
+        font-family: 'Noto Serif SC', serif;
+        display: block;
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 20px;
+        font-size: 3rem;
+        cursor: pointer;
+        border: none;
+        border-radius: 5px;
+        margin: 0 auto 20px;
+        transition: background-color 0.3s ease;
+    }
+    .upload-btn:hover {
+        background-color: #45a049;
+    }
+
+    /* Dark mode styles */
+    body.dark-mode {
+        background-color: #333;
+        color: #fff;
+    }
+    .container.dark-mode {
+        background-color: #444;
+        color: #fff;
+    }
+    h1.dark-mode {
+        color: #fff;
+    }
+    #word-display.dark-mode {
+        color: #fff;
+    }
+    #hint.dark-mode {
+        color: #ccc;
+    }
+    #word-counter.dark-mode {
+        color: #333;
+    }
+    button.dark-mode {
+        background-color: #1a73e8;
+        color: #fff;
+    }
+    .upload-btn.dark-mode {
+        background-color: #0d8050;
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-column">
+            <h1>单词抽背助手</h1>
+            <input type="file" id="fileInput" accept=".txt" style="display: none;">
+            <button id="uploadBtn" class="upload-btn" onclick="document.getElementById('fileInput').click();">上传词库</button>
+            <div id="word-display"></div>
+            <div id="hint"></div>
+        </div>
+        <div class="right-column">
+            <br />
+            <div id="word-counter">计数 <span id="currentWordIndex">0</span> / <span id="totalWordCount">0</span></div>
+            <button id="randomWordBtn" onclick="getRandomWord()">随机一次</button>
+            <button id="viewDefinitionBtn" onclick="viewDefinition()">查看释义</button>
+            <button id="resetBtn" onclick="resetExtraction()" style="display: none;">重新开始</button>
+            <p id="completionMessage" style="display: none; font-size: 1.6rem; color: #666; margin-top: 20px;">已完成所有单词的抽取</p>
+        </div>
+    </div>
+
+    <script>
+        let words = [];
+        let currentWordIndex = 0;
+
+        // Check if dark mode is preferred by user
+        const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        darkModeMediaQuery.addListener(handleColorSchemeChange);
+        handleColorSchemeChange(darkModeMediaQuery);
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const contents = e.target.result;
+                words = contents.trim().split('\n').map(line => line.trim());
+                document.getElementById('uploadBtn').style.display = 'none';
+                document.getElementById('randomWordBtn').style.display = 'inline-block';
+                document.getElementById('viewDefinitionBtn').style.display = 'inline-block';
+
+                // Set total word count
+                document.getElementById('totalWordCount').textContent = words.length;
+
+                // Shuffle words array after loading
+                shuffleArray(words);
+            };
+            reader.readAsText(file);
+        });
+
+        function getRandomWord() {
+            if (words.length === 0) {
+                alert('请先上传含有内容的词库文件！');
+                return;
+            }
+
+            if (currentWordIndex >= words.length) {
+                // 显示完成提示和重置按钮
+                document.getElementById('completionMessage').style.display = 'block';
+                document.getElementById('randomWordBtn').style.display = 'none';
+                document.getElementById('viewDefinitionBtn').style.display = 'none';
+                document.getElementById('resetBtn').style.display = 'inline-block';
+
+                // 清空单词和提示显示
+                document.getElementById('word-display').textContent = '';
+                document.getElementById('hint').textContent = '';
+
+                // 更新当前单词序号显示
+                document.getElementById('currentWordIndex').textContent = currentWordIndex;
+
+                // Reshuffle the array for the next round
+                shuffleArray(words);
+                currentWordIndex = 0; // Reset index for the next round
+
+                return; // 不再执行后续代码
+            }
+
+            const randomWord = words[currentWordIndex];
+            document.getElementById('word-display').textContent = randomWord;
+            document.getElementById('hint').textContent = `请说出 "${randomWord}" 的释义`;
+
+            // 更新当前单词序号显示
+            document.getElementById('currentWordIndex').textContent = currentWordIndex + 1;
+
+            currentWordIndex++;
+        }
+
+        function resetExtraction() {
+            currentWordIndex = 0;
+            document.getElementById('completionMessage').style.display = 'none';
+            document.getElementById('randomWordBtn').style.display = 'inline-block';
+            document.getElementById('viewDefinitionBtn').style.display = 'inline-block';
+            document.getElementById('resetBtn').style.display = 'none'; // 隐藏重置按钮
+            document.getElementById('word-display').textContent = '';
+            document.getElementById('hint').textContent = '';
+
+            // Reset current word index display
+            document.getElementById('currentWordIndex').textContent = '0';
+        }
+
+        function handleColorSchemeChange(e) {
+            const darkModeOn = e.matches;
+            if (darkModeOn) {
+                enableDarkMode();
+            } else {
+                disableDarkMode();
+            }
+        }
+
+        function enableDarkMode() {
+            document.body.classList.add('dark-mode');
+            document.querySelectorAll('.container, h1, #word-display, #hint, button, .upload-btn, #word-counter').forEach(item => {
+                item.classList.add('dark-mode');
+            });
+        }
+
+        function disableDarkMode() {
+            document.body.classList.remove('dark-mode');
+            document.querySelectorAll('.container, h1, #word-display, #hint, button, .upload-btn, #word-counter').forEach(item => {
+                item.classList.remove('dark-mode');
+            });
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function viewDefinition() {
+            const currentWord = document.getElementById('word-display').textContent;
+            const encodedWord = encodeURIComponent(currentWord);
+            const url = `https://www.youdao.com/result?word=${encodedWord}&lang=en`;
+            window.open(url, '_blank');
+        }
+    </script>
+</body>
+</html>
